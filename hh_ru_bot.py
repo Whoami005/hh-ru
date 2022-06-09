@@ -1,9 +1,11 @@
 import json
-from aiogram.utils.markdown import hbold, hlink
+from asyncio import sleep
+
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.dispatcher.filters import Text
+from aiogram.utils.markdown import hbold, hlink
+
 from main import get_data, get_all_page
-from asyncio import sleep
 
 bot = Bot(token="5453274016:AAELeT1GINLRcAliGEaqV4nrS4fm2QyLY7Q", parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot)
