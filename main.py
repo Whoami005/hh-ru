@@ -1,16 +1,15 @@
 import json
-import random
+import time
 
 import requests
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
-import time
 
 ua = UserAgent()
 headers = {'user-agent': f'{ua.random}'}
 
 
-def get_data(experience="noExperience"):
+def get_all_page(experience="noExperience"):
     response = requests.get(
         url=f"https://makhachkala.hh.ru/search/vacancy?experience={experience}&search_field=name&text=Flutter+developer&order_by=relevance&items_on_page=20",
         headers=headers
@@ -18,7 +17,6 @@ def get_data(experience="noExperience"):
     text = response.text
 
     with open('index.html', 'w', encoding='utf-8') as file:
-        print(f"Идет скачивание основной страницы\n")
         file.write(text)
 
     with open('index.html', encoding='utf-8') as file:
@@ -29,42 +27,50 @@ def get_data(experience="noExperience"):
     page_calculation = int(all_vacancies) / 20
     all_page = 1 if page_calculation <= 1 else page_calculation.__ceil__()
 
+    print(f'Найдено {all_vacancies} вакансий\n')
+
+    return all_page, all_vacancies
+
+
+def get_data(experience="noExperience", page=0):
     count = 0
     all_works = []
     all_info = []
-    for page in range(all_page):
-        time.sleep(random.randint(1, 3))
 
-        response = requests.get(
-            url=f"https://makhachkala.hh.ru/search/vacancy?experience={experience}&search_field=name&text=Flutter+developer&order_by=relevance&items_on_page=20&page={page}",
-            headers=headers
+    response = requests.get(
+        url=f"https://makhachkala.hh.ru/search/vacancy?experience={experience}&search_field=name&text=Flutter+developer&order_by=relevance&items_on_page=20&page={page}",
+        headers=headers
+    )
+    text = response.text
+
+    with open('index.html', 'w', encoding='utf-8') as file:
+        file.write(text)
+
+    with open('index.html', encoding='utf-8') as file:
+        page = file.read()
+
+    soup = BeautifulSoup(page, 'lxml')
+    all_hrefs = soup.find_all('a',
+                              {"data-qa": "vacancy-serp__vacancy-title", "target": "_blank", "class": "bloko-link"})
+    for item in all_hrefs:
+        item_href = item.get('href')
+        item_text = item.text.replace(' ', ' ')
+        all_works.append(
+            {
+                "link": item_href,
+                "vacancy": item_text
+            }
         )
-        text = response.text
 
-        with open('index.html', 'w', encoding='utf-8') as file:
-            file.write(text)
-
-        with open('index.html', encoding='utf-8') as file:
-            page = file.read()
-
-        soup = BeautifulSoup(page, 'lxml')
-        all_hrefs = soup.find_all('a',
-                                  {"data-qa": "vacancy-serp__vacancy-title", "target": "_blank", "class": "bloko-link"})
-        for item in all_hrefs:
-            item_href = item.get('href')
-            item_text = item.text
-            all_works.append(
-                {
-                    "link": item_href,
-                    "vacancy": item_text
-                }
-            )
-    print(f'Найдено {len(all_works)} вакансий\n')
+    print(f'Идет скачивание {len(all_works)} вакансий\n')
 
     with open('vacancies.json', 'w', encoding='utf-8') as file:
         json.dump(all_works, file, indent=4, ensure_ascii=False)
 
     for item in all_works:
+        if count % 10 == 0:
+            time.sleep(2)
+
         count += 1
         response = requests.get(url=item.get("link"), headers=headers)
 
@@ -106,20 +112,20 @@ def get_data(experience="noExperience"):
         except Exception as e:
             location = 'нет данных'
 
-        # з/п
+        # получение з/п
         try:
             money = soup.find("div", {"data-qa": "vacancy-salary"}).text.replace(' ', ' ')
         except Exception:
             money = 'нет данных'
 
-        # компания
+        # получение названия компании
         try:
             company = soup.find("a", {"data-qa": "vacancy-company-name", "class": "bloko-link"}).text.replace(' ',
                                                                                                               ' ')
         except Exception:
             company = 'нет данных'
 
-        # требования
+        # получение требований
         try:
             requirements = soup.find("div", class_="bloko-gap bloko-gap_bottom").find_all('p')
             requirements_list = []
@@ -129,7 +135,7 @@ def get_data(experience="noExperience"):
         except Exception:
             requirements_list = 'нет данных'
 
-        # ключевые навыки
+        # получение ключевых навыков
         try:
             skil = soup.find("div", class_="bloko-tag-list").find_all('span')
             skils_list = []
